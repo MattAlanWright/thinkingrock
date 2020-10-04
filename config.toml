@@ -1,0 +1,54 @@
+baseurl = "https://mattalanwright.github.io/"
+title = "Matt Wright"
+theme = "hugo-coder"
+languagecode = "en"
+defaultcontentlanguage = "en"
+
+paginate = 20
+canonifyurls = true
+
+pygmentsstyle = "monokai"
+pygmentscodefences = true
+pygmentscodefencesguesssyntax = true
+
+[params]
+    author = "I'm Matt Wright"
+    info = "I write code."
+    description = "Matt Wright's personal website"
+    keywords = "blog,developer,personal,machine learning"
+
+    hidecredits = true
+    hidecopyright = true
+
+    rtl = false
+
+    # Specify light/dark colorscheme
+    # Supported values:
+    # "auto" (use preference set by browser)
+    # "dark" (dark background, light foreground)
+    # "light" (light background, dark foreground) (default)
+    colorscheme = "auto"
+
+    math = true
+    custom_css = []
+
+# Social links
+[[params.social]]
+    name = "Github"
+    icon = "fa fab fa-github fa-2x"
+    weight = 1
+    url = "https://github.com/MattAlanWright"
+
+# Menu links
+[[menu.main]]
+    name = "Articles"
+    weight = 1
+    url = "/articles/"
+[[menu.main]]
+    name = "About"
+    weight = 2
+    url = "/about/"
+[[menu.main]]
+    name = "Contact"
+    weight = 3
+    url = "/contact/"
