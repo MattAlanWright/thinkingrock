@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Language" content="en">
+
+    <meta name="author" content="I&#39;m Matt Wright">
+    <meta name="description" content="Hands-on practical introduction to the policy gradient theorem and REINFORCE using PyTorch">
+    <meta name="keywords" content="blog,developer,personal,machine learning">
+
+    <meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Practical REINFORCE in PyTorch"/>
+<meta name="twitter:description" content="Hands-on practical introduction to the policy gradient theorem and REINFORCE using PyTorch"/>
+
+    <meta property="og:title" content="Practical REINFORCE in PyTorch" />
+<meta property="og:description" content="Hands-on practical introduction to the policy gradient theorem and REINFORCE using PyTorch" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://mattalanwright.github.io/articles/reinforce/" />
+<meta property="article:published_time" content="2020-01-23T21:31:24-04:00" />
+<meta property="article:modified_time" content="2020-01-23T21:31:24-04:00" />
+
+
+    <title>
+  Practical REINFORCE in PyTorch · Matt Wright
+</title>
+
+    
+      <link rel="canonical" href="https://mattalanwright.github.io/articles/reinforce/">
+    
+
+    <link href="https://fonts.googleapis.com/css?family=Lato:400,700%7CMerriweather:300,700%7CSource+Code+Pro:400,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fork-awesome@1.1.7/css/fork-awesome.min.css" integrity="sha256-gsmEoJAws/Kd3CjuOQzLie5Q3yshhvmo7YNtBG7aaEY=" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css" integrity="sha256-l85OmPOjvil/SOvVt3HnSSjzF1TUMyT9eV0c2BzEGzU=" crossorigin="anonymous" />
+
+    
+      
+      
+      <link rel="stylesheet" href="https://mattalanwright.github.io/css/coder.min.9836c03fe5c87d102278a33e86d0591ef36c89b1e17e8e547ebf84c05cee010e.css" integrity="sha256-mDbAP&#43;XIfRAieKM&#43;htBZHvNsibHhfo5Ufr&#43;EwFzuAQ4=" crossorigin="anonymous" media="screen" />
+    
+
+    
+
+    
+      
+        
+        
+        <link rel="stylesheet" href="https://mattalanwright.github.io/css/coder-dark.min.717236c74e0a5208ef73964a9f44c6b443b689a95b270d8b2a40d0c012460dac.css" integrity="sha256-cXI2x04KUgjvc5ZKn0TGtEO2ialbJw2LKkDQwBJGDaw=" crossorigin="anonymous" media="screen" />
+      
+    
+
+    
+
+    
+
+    <link rel="icon" type="image/png" href="https://mattalanwright.github.io/images/favicon-32x32.png" sizes="32x32">
+    <link rel="icon" type="image/png" href="https://mattalanwright.github.io/images/favicon-16x16.png" sizes="16x16">
+
+    <link rel="apple-touch-icon" href="https://mattalanwright.github.io/images/apple-touch-icon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="https://mattalanwright.github.io/images/apple-touch-icon.png">
+
+    
+
+    <meta name="generator" content="Hugo 0.75.1" />
+  </head>
+
+  
+  
+    
+  
+  <body class="colorscheme-auto"
+        onload=""
+  >
+    <main class="wrapper">
+      <nav class="navigation">
+  <section class="container">
+    <a class="navigation-title" href="https://mattalanwright.github.io/">
+      Matt Wright
+    </a>
+    
+      
+        <span id="dark-mode-toggle" class="float-right">
+          <i class="fa fa-adjust fa-fw" aria-hidden="true"></i>
+        </span>
+      
+      <input type="checkbox" id="menu-toggle" />
+      <label class="menu-button float-right" for="menu-toggle">
+        <i class="fa fa-bars fa-fw" aria-hidden="true"></i>
+      </label>
+      <ul class="navigation-list">
+        
+          
+            <li class="navigation-item">
+              <a class="navigation-link" href="https://mattalanwright.github.io/articles/">Articles</a>
+            </li>
+          
+            <li class="navigation-item">
+              <a class="navigation-link" href="https://mattalanwright.github.io/about/">About</a>
+            </li>
+          
+            <li class="navigation-item">
+              <a class="navigation-link" href="https://mattalanwright.github.io/contact/">Contact</a>
+            </li>
+          
+        
+        
+        
+          <li class="navigation-item separator">
+            <span>|</span>
+          </li>
+        
+      </ul>
+    
+  </section>
+</nav>
+
+
+      <div class="content">
+        
+  <section class="container page">
+  <article>
+    <header>
+      <h1>Practical REINFORCE in PyTorch</h1>
+    </header>
+
+    <p>This article is a hands-on introduction to building gradient-based reinforcement learning algorithms in PyTorch. We&rsquo;ll review the policy gradient theorem, the foundation for gradient-based learning methods, and how it&rsquo;s used in practice. Then we&rsquo;ll implement the classic REINFORCE learning algorithm, as it appears in <a href="http://www.andrew.cmu.edu/course/10-703/textbook/BartoSutton.pdf">Sutton and Barto&rsquo;s <em>Reinforcement Learning</em></a> and use it to teach an agent to solve the OpenAI Gym <a href="https://gym.openai.com/envs/CartPole-v0/">CartPole environment</a>. This algorithm is a great way to gain experience with gradient-based learning, and understanding it will help pave the way to building more complex learning algorithms, like the Actor-Critic.</p>
+<p>If you&rsquo;ve found this page then I&rsquo;m assuming that you know the basics of reinforcement learning methods and terminology. By the end of this article I hope that you&rsquo;ll have developed an intuition for how gradient-based learning builds on these foundations.</p>
+<h2 id="the-policy-gradient-theorem">The Policy Gradient Theorem</h2>
+<p>Before we look at REINFORCE, let&rsquo;s dive into the <em>policy gradient theorem</em>, which provides the foundation of the algorithm. For the case of an episodic task, the policy gradient theorem as described in Sutton and Barto states that</p>
+<p>$$ \nabla J(\theta) \propto  \sum_s{\mu(s)}\sum_a{q_{\pi}(s,a)\nabla\pi(a|s,\theta)}$$</p>
+<p>where</p>
+<ul>
+<li>$J(\theta)$ is a scalar performance measure of the current policy</li>
+<li>$\mu(s)$ is the distribution of states $s$ over policy $\pi$</li>
+<li>$q_{\pi}(s,a)$ is the action value function evaluated at state $s$ and action $a$</li>
+<li>$\pi(a|s,\theta)$ is the policy, evaluated at state $s$ and action $a$, and parameterized by $\theta$</li>
+</ul>
+<p>We&rsquo;ll explain what this theorem is saying soon, but first we should be clear on what all those pieces are. If you&rsquo;re reading this post, I&rsquo;m going to assume you&rsquo;re pretty comfortable with the action value function $q_{\pi}(s,a)$ . The state distribution is self-explanatory* and we&rsquo;ll come back to the performance measure in a bit. For now, let&rsquo;s spend a bit more time with this formulation of $\pi$, which probably looks a little different than you&rsquo;re used to.</p>
+<p>There are two key things to notice about the policy under this formulation. First, it&rsquo;s parameterized on $\theta$. If this is your first look at REINFORCE or the policy gradient theorem, you might not be used to seeing that $\theta$ there. While the policy gradient theorem doesn&rsquo;t require any specific formulation of $\pi$, it does require that it&rsquo;s a parameterized function, i.e. that it uses some set of parameters $\theta$ to calculate the final result when passed in an action $a$ and state $s$. We&rsquo;ll assume (or assert/decide/whatever) that $\theta$ is a vector or matrix of weights used in some simple linear function or neural network, since this is almost always the case in practice. Second, notice that we&rsquo;re taking the gradient of this function, so it must be differentiable - one more good reason to use a neural network. To be clear, it must be differentiable with respect to the weight vector $\theta$, with $a$ and $s$ fixed. This is because we ultimately want to figure out what direction we can nudge those weights in order to increase or decrease the probability of taking action $a$ at state $s$ in the future.</p>
+<p>Now let&rsquo;s take another look at the performance measure $J(\theta)$. I&rsquo;m not going to get into the nitty-gritty here, since this is much better handled in Sutton and Barto and because I&rsquo;m more concerned with getting to the implementation, but the idea here is that $J(\theta)$ is a scalar measurement of &ldquo;how good&rdquo; your policy is as a function of its parameter vector $\theta$. Of course, it&rsquo;s not at all obvious what this function should be, and there are actually plenty of candidates depending on whether this is an episodic or continuing environment. One possible measurement that makes pretty good intuitive sense is the value of your starting state:</p>
+<p>$$J(\theta) \equiv V_{\pi_{\theta}}(s_{0})$$</p>
+<p>where $V_{\pi_{\theta}}(s_{0})$ is a standard state value function, i.e. an estimate of the total return you expect to see starting in state $s_{0}$ and following your policy $\pi_{\theta}$. This should make intuitive sense, since if the value of $s_0$ is high, then your policy is obviously a good one and whatever $\theta$ you chose must have been good. Conversely, if it&rsquo;s low then your policy isn&rsquo;t great and you want to adjust $\theta$ to increase the reward you expect to see. Of course, in order to do that, you need to know to know how $\theta$ should be adjusted to increase your expected return. That&rsquo;s where the policy gradient theorem comes in.</p>
+<p>The policy gradient theorem gives you a tractable, useful definition of the gradient of your performance measure (or at least something proportional to the gradient, which is just as good). The proof is available elsewhere (check Sutton and Barto), but it&rsquo;s true for several different candidate performance measures, including $J(\theta) \equiv V_{\pi_{\theta}}(s_{0})$. This is described pretty off-handedly in Sutton and Barto, but it&rsquo;s worth taking a second to let it sink in: using the formula from the beginning of this section (and a few more steps we&rsquo;ll describe below) we can determine an update to our weight vector $\theta$ that will increase the performance of our agent, regardless of the environment or the task.</p>
+<p><strong>*Just in case you <em>don&rsquo;t</em> think it&rsquo;s self-explanatory, this is, roughly, the probability of being in state $s$, or the frequency with which state $s$ appears. We&rsquo;re going to make this term disappear later, so don&rsquo;t sweat it too much right now.</strong></p>
+<h3 id="simplifying-the-formula">Simplifying the formula</h3>
+<p>That&rsquo;s a really good start, but while it&rsquo;s mathematically tractable, the policy gradient as shown above can&rsquo;t be used in a real-world learning algorithm. First of all, there&rsquo;s that state distribution $\mu(s)$, which we don&rsquo;t know. Second, the equation shown above is generalized over the state and action variables $s$ and $a$, but we don&rsquo;t want a general formula - we want an algorithm that can operate on samples of the random variables $S_{t}$ and $A_{t}$. What do I mean by that? The definition of the policy gradient above is based on $q_{\pi}(s,a)$ and  $\pi(a|s,\theta)$ over the entire domain  of $s$ and $a$. But we don&rsquo;t know what $q_{\pi}(s,a)$ and $\pi(a|s,\theta)$ look like over all $s$ and $a$. We likely don&rsquo;t know what they look like at all. What we *can* do, is sample over those domains. In other words, we have random variables $S_{t}$ and $A_{t}$ that we can sample by letting episodes play out under our policy $\pi$ to try to get an estimate of those functions. So let&rsquo;s start chipping away at that formula to see if we can come up with something more useful.</p>
+<p>First, notice that</p>
+<p>$$\sum_s{\mu(s)}\sum_a{q_{\pi}(s,a)\nabla\pi(a|s,\theta)}$$</p>
+<p>is just an expectation over $s$. This is simply the definition of an expectation, bearing in mind that $\mu(s)$ is effectively the probability distribution of $s$. So, keeping in mind that</p>
+<p>$$\mathbb{E}[f(S_{t})] \equiv \sum_{s}Pr(S_{t} = s)f(s)$$</p>
+<p>we can re-write this as</p>
+<p>$$\mathbb{E}[{\sum_a{q(S_{t},a)\nabla\pi(a|S_{t},\theta)}}]$$</p>
+<p>We got rid of that $s$ and replaced it with something we can actually sample, namely the random variable $S_{t}$. Now let&rsquo;s try to do the same with that $a$. For this we&rsquo;re going to use some trickery. If we multiply everything inside that expectation by $\frac{\pi(a|S_{t},\theta)}{\pi(a|S_{t},\theta)}$ we end up with</p>
+<p>$$\mathbb{E}[\sum_{a}   \pi(a|S_{t},\theta)   q(S_{t},a)   \frac{\nabla\pi(a|S_{t},\theta)}{\pi(a|S_{t},\theta)}  ]$$</p>
+<p>This might not look better at first, but remember that $\pi(a|S_{t},\theta)$ is really the distribution over actions. This means that summation over actions becomes another expectation. Since the expectation of an expectation is an expectation, we can re-write this as</p>
+<p>$$\mathbb{E}[q(S_{t},A_{t})   \frac{\nabla\pi(A_{t}|S_{t},\theta)}{\pi(A_{t}|S_{t},\theta)}  ]$$</p>
+<p>Our $a$ has been replaced with the much more useful $A_{t}$. And since the expectation of that action value function is by definition the expected return, we can simplify a bit more to</p>
+<p>$$\mathbb{E}[G_{t}  \frac{\nabla\pi(A_{t}|S_{t},\theta)}{\pi(A_{t}|S_{t},\theta)}  ]$$</p>
+<p>Voila! We now have a dead-simple formula over two random variables, $S_{t}$ and $A_{t}$, both of which we can sample repeatedly to build up that expectation. For one last simplifying step, let&rsquo;s recall that</p>
+<p>$$\nabla \ln{f} = \frac{\nabla{f}}{f}$$</p>
+<p>and tweak that last formula just a bit. What we end up with is</p>
+<p>$$\nabla{J(\theta)} \propto \mathbb{E}[G_{t}\nabla \ln \pi(A_{t}|S_{t},\theta)]$$</p>
+<p>That last step might seem needless, but logs just happen to be nicer to play with (they&rsquo;re much more numerically stable because they grow so slowly). The fact that its proportional rather than equivalent is fine: that proportionality rule gets absorbed into whatever learning rate we choose and that all comes out in the wash.</p>
+<p>So that&rsquo;s it. That formula says that if we can somehow approximate the expected value of that thing on the right (not necessarily trivial, but doable) then we have an answer to the question &ldquo;How can I tweak these weights to improve my policy?&rdquo;</p>
+<p>Let&rsquo;s see how we might go about that.</p>
+<h3 id="the-policy-gradient-monte-carlo-and-reinforce">The Policy Gradient, Monte Carlo, and REINFORCE</h3>
+<p>The beauty of REINFORCE is its simplicity. It&rsquo;s pretty much the most straight-forward method you could come up with to put the policy gradient theorem to work. The theorem says we need to evaluate the expectation of $G_{t}\nabla \ln \pi(A_{t}|S_{t},\theta)$, so how might we do that? Rather than sprain any muscles trying to be clever, REINFORCE does the obvious: Monte Carlo sampling. For any given episode of a reinforcement learning task, $G_{t}$ is measurable and samples of $A_{t}$ and $S_{t}$ can be recorded. As long as you don&rsquo;t mind waiting until the end of the episode to calculate the expectation and perform your update, that&rsquo;s all you need.</p>
+<p>The idea behind REINFORCE is: let an episode play out and record all states, actions and rewards as you go. Once it&rsquo;s done, calculate $G_{t}$ for all $t$. Then loop through all your recorded state-action pairs, feed those back into your policy and update your weights according to the gradient of that policy. Below is the definition of REINFORCE, taken directly from Sutton and Barto:</p>
+<p><img src="https://mattalanwright.github.io/reinforce_algo.png" alt="reinforce_algo"></p>
+<p>Since I&rsquo;ve lifted most of this post right from the book, the notation should look familiar. The constant $\alpha$ is our learning rate and takes care of the proportionality in our original formula. One new item that we haven&rsquo;t seen before is the constant $\gamma$. Anyone coming from a reinforcement learning background will be familiar with this. This is the <em>discount factor</em>, and it&rsquo;s there to ensure that the later a reward comes in time, the less effect it has on $G_{t}$. This is pretty standard reinforcement learning and explained better elsewhere so if you&rsquo;re uncomfortable with this, take a quick tour through the internet and come back. It doesn&rsquo;t make a lot of difference and in fact you could implement REINFORCE without it (though I do include it in my code).</p>
+<h2 id="pytorch-implementation">PyTorch Implementation</h2>
+<p>Let&rsquo;s finally get to the implementation. I&rsquo;m going to assume you have PyTorch installed. You&rsquo;ll also need the OpenAI gym package, since we&rsquo;ll be teaching an agent to solve the CartPole environment. The final code will be available on GitHub as a Jupyter notebook.</p>
+<h3 id="policy">Policy</h3>
+<p>The first thing we&rsquo;ll do is define our policy, but before we get into the code we need to discuss a subtle but important point about the definition of an agent&rsquo;s &ldquo;policy&rdquo;. Typically, an agent&rsquo;s policy is its decision-making tool: it takes in a state, produces a probability distribution over the possible actions, and then chooses an action by sampling from that probability distribution. When we talk about policies, this is usually what we mean. But in the formula for the policy gradient given above, this is not quite what we mean by $\pi(a|s,\theta)$. Our policy $\pi$ does <em>not</em> include the sampling mechanism, it&rsquo;s just the probability distribution over actions. And when we write  $\pi(a|s,\theta)$, we&rsquo;re referring to the probability of selecting the <em>specific action</em> $a$. This is a pretty subtle point, but it&rsquo;s important to know precisely what the policy gradient means when you&rsquo;re trying to code it.</p>
+<p>The diagram below illustrates our policy for the CartPole environment, whose state is a tensor of length four and in which we can take one of two possible actions:</p>
+<p><img src="https://mattalanwright.github.io/policy.png" alt="policy"></p>
+<p>Spoiler alert: our policy is going to be a simple linear network with no hidden layers. This network, which we&rsquo;ll refer to specifically as the <em>policy network</em>, produces a probability distribution over the two actions using a softmax. From here, that probability distribution is fed into a multinomial sampler which chooses an action based on that probability distribution. Why is it important for us to keep all of these components separate? Because the policy gradient theorem requires us to take the gradient of our policy, and there&rsquo;s no such thing as the gradient of a sampler. Once we select an action, we <em>can</em> take the gradient of our policy network, defining the probability of that action as the output.</p>
+<p>So, with all that in mind, let&rsquo;s define our <em>Policy Network</em>. This is going to be our $\pi(a|s,\theta)$, without the sampling mechanism:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#66d9ef">class</span> <span style="color:#a6e22e">PolicyNetwork</span>(nn<span style="color:#f92672">.</span>Module):
+    <span style="color:#66d9ef">def</span> __init__(self, input_size, output_size):
+        super(PolicyNetwork, self)<span style="color:#f92672">.</span>__init__()
+        self<span style="color:#f92672">.</span>output <span style="color:#f92672">=</span> nn<span style="color:#f92672">.</span>Linear(input_size, output_size)
+
+    <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">forward</span>(self, x):
+        x <span style="color:#f92672">=</span> F<span style="color:#f92672">.</span>softmax(self<span style="color:#f92672">.</span>output(x))
+        <span style="color:#66d9ef">return</span> x
+</code></pre></div><p>If you aren&rsquo;t familiar with the PyTorch-isms above, then take a look at <a href="https://pytorch.org/tutorials/beginner/blitz/neural_networks_tutorial.html#sphx-glr-beginner-blitz-neural-networks-tutorial-py" title="PyTorch Neural Network Tutorial">PyTorch&rsquo;s neural network tutorial</a>. All we&rsquo;re doing is defining a simple network that takes the state as an <em>input_size</em>-length vector and produces a probability distribution over <em>output_size</em> possible actions. The softmax is used to produce a proper probability distribution from our network&rsquo;s output. Pretty simple so far.</p>
+<h3 id="reinforce-algorithm">REINFORCE Algorithm</h3>
+<p>I decided to implement REINFORCE as a single function that internally creates a <em>PolicyNetwork</em> instance:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">REINFORCE</span>(env, state_space_size, action_space_size, num_episodes, gamma<span style="color:#f92672">=</span><span style="color:#ae81ff">0.99</span>):
+    
+    <span style="color:#75715e"># Check to see if we can run on the GPU</span>
+    device <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>device(<span style="color:#e6db74">&#34;cuda:0&#34;</span> <span style="color:#66d9ef">if</span> torch<span style="color:#f92672">.</span>cuda<span style="color:#f92672">.</span>is_available() <span style="color:#66d9ef">else</span> <span style="color:#e6db74">&#34;cpu&#34;</span>)
+    
+    <span style="color:#75715e"># Create policy network (i.e. differentiable policy function)</span>
+    policy <span style="color:#f92672">=</span> PolicyNetwork(state_space_size, action_space_size)<span style="color:#f92672">.</span>to(device)
+    optimizer <span style="color:#f92672">=</span> optim<span style="color:#f92672">.</span>Adam(policy<span style="color:#f92672">.</span>parameters(), lr<span style="color:#f92672">=</span><span style="color:#ae81ff">1e-3</span>)
+    
+    <span style="color:#f92672">...</span>
+</code></pre></div><p>Of course we do the obligatory check to see if we have a GPU available. We create our network as well as an optimizer for training later.</p>
+<p>REINFORCE plays out some number of episodes and updates its parameters after each one. Let&rsquo;s start adding the scaffolding for that. Assume the next few code blocks are being appended to previous one (minus the correct indentation). I&rsquo;ll let you know when that changes.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#75715e"># Record all of the scores to review later</span>
+scores <span style="color:#f92672">=</span> []
+
+<span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> range(num_episodes):
+
+    <span style="color:#75715e"># All states, actions and rewards need to be recorded for training</span>
+    states  <span style="color:#f92672">=</span> []
+    actions <span style="color:#f92672">=</span> []
+    rewards <span style="color:#f92672">=</span> []
+
+    <span style="color:#75715e"># Reset the score and the environment for this episode</span>
+    score <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>
+    state <span style="color:#f92672">=</span> env<span style="color:#f92672">.</span>reset()
+
+    <span style="color:#75715e"># Play out an episode using the current policy</span>
+    <span style="color:#66d9ef">while</span> True:
+
+        <span style="color:#f92672">...</span>
+</code></pre></div><p>To play through an episode, we feed the current state to our policy network, sample an action from the probabilities it produces, feed the action to the environment and repeat. Along the way, we record everything for training. Remember, this is a Monte Carlo algorithm and all our training happens later:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#75715e"># Play out an episode using the current policy</span>
+<span style="color:#66d9ef">while</span> True:
+
+    <span style="color:#75715e"># Take a step and generate action probabilities for current state</span>
+    <span style="color:#75715e"># The state must first be turned into a tensor and sent to the device</span>
+    state_tensor <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>from_numpy(state)<span style="color:#f92672">.</span>float()<span style="color:#f92672">.</span>to(device)
+    action_probs <span style="color:#f92672">=</span> policy<span style="color:#f92672">.</span>forward(state_tensor)
+
+    <span style="color:#75715e"># Sample from softmax output to get next action</span>
+    <span style="color:#75715e"># &#39;Categorical&#39; is the same as &#39;Multinomial&#39;</span>
+    m <span style="color:#f92672">=</span> Categorical(action_probs)
+    action <span style="color:#f92672">=</span> m<span style="color:#f92672">.</span>sample()
+
+    <span style="color:#75715e"># Take another step, update the state, and check the reward</span>
+    <span style="color:#75715e"># Calling item retrieves the action value from the action tensor</span>
+    next_state, reward, done, _ <span style="color:#f92672">=</span> env<span style="color:#f92672">.</span>step(action<span style="color:#f92672">.</span>item())
+    score <span style="color:#f92672">+=</span> reward
+
+    <span style="color:#75715e"># Record all of our states, actions and rewards</span>
+    rewards<span style="color:#f92672">.</span>append(reward)
+    states<span style="color:#f92672">.</span>append(state)
+    actions<span style="color:#f92672">.</span>append(action)
+
+    <span style="color:#75715e"># Update the state for the next step</span>
+    state <span style="color:#f92672">=</span> next_state
+
+    <span style="color:#66d9ef">if</span> done:
+        <span style="color:#66d9ef">print</span>(<span style="color:#e6db74">&#34;Episode: {} Score: {}&#34;</span><span style="color:#f92672">.</span>format(i, score))
+        <span style="color:#66d9ef">break</span>
+</code></pre></div><p>There are a couple of PyTorch-specific things to look at here. First, our policy needs the state to be a PyTorch tensor, so we need to convert it from a numpy array. Second, in case you&rsquo;re not familiar with &lsquo;Categorical&rsquo;, it is imported from PyTorch&rsquo;s <em>distributions</em> package and allows us to sample from a multinomial distribution over the action probabilities we generated from our policy. Basically, we can feed it a tensor of probabilites and then sample from that vector according to those probabilities. This is that non-differentiable sampler we talked about earlier.</p>
+<p>Now it&rsquo;s time to train. We update our weights after every single episode:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#75715e"># Now that the episode is done, update out policy for each timestep</span>
+<span style="color:#66d9ef">for</span> t <span style="color:#f92672">in</span> range(len(states)):
+
+    <span style="color:#75715e"># Get returns at all times, i.e. G[t] for all t</span>
+    G <span style="color:#f92672">=</span> sum([r <span style="color:#f92672">*</span> gamma <span style="color:#f92672">**</span> i <span style="color:#66d9ef">for</span> i, r <span style="color:#f92672">in</span> enumerate(rewards[t:])])
+
+    <span style="color:#75715e"># Update our weights. First, zero the gradients</span>
+    optimizer<span style="color:#f92672">.</span>zero_grad()
+
+    <span style="color:#75715e"># Convert state to a tensor and re-evaluate probability distribution</span>
+    state_tensor <span style="color:#f92672">=</span> torch<span style="color:#f92672">.</span>from_numpy(states[t])<span style="color:#f92672">.</span>float()<span style="color:#f92672">.</span>to(device)
+    probs <span style="color:#f92672">=</span> policy(state_tensor)
+
+    <span style="color:#75715e"># Evaluate performanc as per the policy gradient theorem and update our</span>
+    <span style="color:#75715e"># weights to take a step in the direction of increased performance.</span>
+    m <span style="color:#f92672">=</span> Categorical(probs)
+    performance <span style="color:#f92672">=</span> <span style="color:#f92672">-</span>m<span style="color:#f92672">.</span>log_prob(actions[t]) <span style="color:#f92672">*</span> G
+    performance<span style="color:#f92672">.</span>backward()
+    optimizer<span style="color:#f92672">.</span>step()
+</code></pre></div><p>This is the busiest section, so let&rsquo;s walk through it slowly. That first line inside the for-loop is just using list comprehension to generate our list of returns $G$, index-able by <code>t</code>. I&rsquo;m pretty sure this could be more efficiently done, but this way is simpler.</p>
+<p>Then we zero our gradients. Pretty standard.</p>
+<p>Next, we re-feed the state at each timestep back into our policy network. This is done because we&rsquo;re about to take the gradient of that policy network with respect to our weights, given a fixed state and action selection. We want to know what direction we could have tweaked the weights when fed state $s_{t}$ in order to increase or decrease the probability of action $a_{t}$, depending on how good it was.</p>
+<p>Next, we re-build our <em>Categorical</em> sampler. Yes, I know, I&rsquo;m re-doing a lot of work here. PyTorch is actually capable of letting us avoid re-feeding the state and re-creating the sampler but at the cost of my intention to keep this is as simple and one-to-one with Sutton and Barto as I can. The sampler is rebuilt specifically because PyTorch&rsquo;s distribution classes have a built-in mechanism that let&rsquo;s us take the gradient of our policy network as if our policy network had only a single output, the chosen action.</p>
+<p>If that didn&rsquo;t make sense, then take another look at the diagram of the policy above. The output of the network is <em>two</em> action probabilities. It&rsquo;s effectively two different functions operating in parallel. But we want the gradient of $\pi(a|s,\theta)$, as in the gradient of whichever of those functions produced the selected action. PyTorch&rsquo;s distribution classes let you do this: you can feed all probabilities into the distribution class (for us, this is the &lsquo;Categorical&rsquo; class) and then call <code>log_prob(action)</code> on that instance. This not only gives you the log of the probability of that action but provides that log probability as a one-dimensional tensor that you can call <code>backward()</code> on, i.e. take the gradient of. This is exactly what the policy gradient theorem wants from us.</p>
+<p>If you want to dive into those last points a bit more, then check out <a href="https://pytorch.org/docs/stable/distributions.html">PyTorch&rsquo;s distributions documentation</a> where they explain it more thoroughly. Be careful though: they use terminology that&rsquo;s slightly out of sync with us and with Sutton and Barto.</p>
+<p>After that we: multiply by the return at that time step, as prescribed by the policy gradient theorem; multiply by -1 to turn our gradient descent machine into a gradient <em>ascent</em> machine; let PyTorch update the weights. Remember that, according to the policy gradient theorem, the line</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python">m<span style="color:#f92672">.</span>log_prob(actions[t]) <span style="color:#f92672">*</span> G
+</code></pre></div><p><em>is</em> the gradient of our performance measure (well, proportional to it). This isn&rsquo;t the gradient of a loss function that we want to minimize, it&rsquo;s the gradient of the performance metric we want to maximize (don&rsquo;t get confused: it&rsquo;s not the performance metric itself, it&rsquo;s the performance metric&rsquo;s gradient). Since PyTorch automatically performs gradient descent, we reverse this with the negative sign.</p>
+<p>And that&rsquo;s it! Now we just need to create an environment and let it do its thing (this code block is no longer inside the definition of <code>REINFORCE</code>):</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python">env <span style="color:#f92672">=</span> gym<span style="color:#f92672">.</span>make(<span style="color:#e6db74">&#34;CartPole-v0&#34;</span>)
+action_space_size <span style="color:#f92672">=</span> env<span style="color:#f92672">.</span>action_space<span style="color:#f92672">.</span>n
+state_space_size <span style="color:#f92672">=</span> env<span style="color:#f92672">.</span>observation_space<span style="color:#f92672">.</span>shape[<span style="color:#ae81ff">0</span>]
+scores <span style="color:#f92672">=</span> REINFORCE(env,
+                   state_space_size<span style="color:#f92672">=</span>state_space_size,
+                   action_space_size<span style="color:#f92672">=</span>action_space_size,
+                   num_episodes<span style="color:#f92672">=</span><span style="color:#ae81ff">5000</span>)
+</code></pre></div><p>Below is a screenshot of the training curve for this code on the CartPole-v0 environment.</p>
+<p><img src="https://mattalanwright.github.io/results.png" alt="results"></p>
+<p>Not too shabby for an algorithm from 1992. You can check out the full implementation at <a href="https://github.com/MattAlanWright/pytorch-reinforce">https://github.com/MattAlanWright/pytorch-reinforce</a>.</p>
+<p>This article barely scratches the surface. There&rsquo;s a lot more you can do with the policy gradient theorem. Despite its age, it&rsquo;s still a major component in most modern reinforcement learning techniques. For a bit of background reading, check out <a href="http://www-anw.cs.umass.edu/~barto/courses/cs687/williams92simple.pdf">Williams' original paper</a> where he defines the REINFORCE family of algorithms, and the <a href="https://homes.cs.washington.edu/~todorov/courses/amath579/reading/PolicyGradient.pdf">paper by Sutton et. al.</a> where they formalize the policy gradient theorem.</p>
+<p>I hope this helped someone out there. Feel free to email me with questions, comments or critiques.</p>
+
+  </article>
+</section>
+
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script type="text/javascript" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/startup.js" id="MathJax-script"></script>
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [
+          ['$', '$'], ['\\(', '\\)']
+        ],
+        processEscapes: true,
+        processEnvironments: true
+      },
+      options: {
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+      }
+    };
+  </script>
+
+      </div>
+
+      
+  <footer class="footer">
+    <section class="container">
+      
+      
+      
+      
+    </section>
+  </footer>
+
+    </main>
+
+    
+      
+      <script src="https://mattalanwright.github.io/js/dark-mode.min.0213e1773e6d1c5a644f847c67a6f8abac49a3776e2976f6008038af8c5b76a1.js"></script>
+    
+
+    
+
+    
+
+    
+
+    
+
+  </body>
+
+</html>
